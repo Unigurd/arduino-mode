@@ -35,6 +35,7 @@
 (require 'spinner)
 
 (eval-when-compile
+  (require 'cl)
   (require 'cl-lib)
   (require 'cc-langs)
   (require 'cc-fonts)
@@ -201,86 +202,54 @@ Value is a symbol.  The possible values are the symbols in the
 		                nil ["Open with Arduino" arduino-open-with-arduino t])
 (easy-menu-add-item arduino-menu
 		                nil ["Serial monitor" arduino-serial-monitor t])
-
-(defvar arduino-upload-process-buf nil)
+(defun arduino-compile (command)
+  "Execute COMMAND with the Arduino compiler."
+  (lexical-let*
+      ((arduino-process-buf (buffer-name))
+       (proc-name (concat "arduino-" command))
+       (proc-buffer (concat "*" proc-name "*"))
+       (proc-succeed-message (concat "Arduino " command " succeed."))
+       (proc (make-process
+              :command (list arduino-executable (concat "--" command) (buffer-file-name))
+              :name proc-name
+              :buffer proc-buffer
+              :sentinel (lambda (proc event)
+                          (if (string= event "finished\n")
+                              (progn
+                                (with-current-buffer arduino-process-buf
+                                  (setq mode-line-process nil))
+                                (message proc-succeed-message))
+                            (with-current-buffer arduino-process-buf
+                              (display-buffer proc-buffer)))
+                          (setq-local mode-line-process nil)
+                          (with-current-buffer arduino-process-buf
+                            (when spinner-current (spinner-stop))))
+              :filter (lambda (proc string)
+                        (when (buffer-live-p (process-buffer proc))
+                          (with-current-buffer (process-buffer proc)
+                            (let ((buffer-read-only nil)
+                                  (moving (= (point) (process-mark proc))))
+                              (save-excursion
+                                ;; Insert the text, advancing the process marker.
+                                (goto-char (process-mark proc))
+                                (insert string)
+                                (set-marker (process-mark proc) (point)))
+                              (if moving (goto-char (process-mark proc))))))))))
+    (spinner-start arduino-spinner-type)
+    (setq mode-line-process proc-name)
+    (with-current-buffer proc-buffer
+      (let ((buffer-read-only nil)) (erase-buffer)
+           (compilation-mode)))))
 
 (defun arduino-upload ()
   "Build and upload the sketch to an Arduino board."
   (interactive)
-  (setq arduino-upload-process-buf (buffer-name))
-  (let* ((proc-name "arduino-upload")
-         (proc-buffer "*arduino-upload*")
-         (proc (make-process
-                :command (list arduino-executable "--upload" (buffer-file-name))
-                :name proc-name
-                :buffer proc-buffer
-                :sentinel (lambda (proc event)
-                            (if (string= event "finished\n")
-                                (progn
-                                  (with-current-buffer arduino-upload-process-buf
-                                    (setq mode-line-process nil))
-                                  (message "Arduino upload succeed."))
-                              (with-current-buffer arduino-upload-process-buf
-                                (display-buffer "*arduino-upload*")))
-                            (setq-local mode-line-process nil)
-                            (with-current-buffer arduino-upload-process-buf
-                              (when spinner-current (spinner-stop))))
-                :filter (lambda (proc string)
-                          (when (buffer-live-p (process-buffer proc))
-                            (with-current-buffer (process-buffer proc)
-                              (let ((buffer-read-only nil)
-                                    (moving (= (point) (process-mark proc))))
-                                (save-excursion
-                                  ;; Insert the text, advancing the process marker.
-                                  (goto-char (process-mark proc))
-                                  (insert string)
-                                  (set-marker (process-mark proc) (point)))
-                                (if moving (goto-char (process-mark proc))))))))))
-    (spinner-start arduino-spinner-type)
-    (setq mode-line-process proc-name)
-    (with-current-buffer proc-buffer
-      (let ((buffer-read-only nil)) (erase-buffer)
-           (compilation-mode)))))
-
-(defvar arduino-verify-process-buf nil)
+  (arduino-compile "upload"))
 
 (defun arduino-verify ()
   "Verify the sketch by building it."
   (interactive)
-  (setq arduino-verify-process-buf (buffer-name))
-  (let* ((proc-name "arduino-verify")
-         (proc-buffer "*arduino-verify*")
-         (proc (make-process
-                :command (list arduino-executable "--verify" (buffer-file-name))
-                :name proc-name
-                :buffer proc-buffer
-                :sentinel (lambda (proc event)
-                            (if (string= event "finished\n")
-                                (progn
-                                  (with-current-buffer arduino-verify-process-buf
-                                    (setq mode-line-process nil))
-                                  (message "Arduino verify build succeed."))
-                              (with-current-buffer arduino-verify-process-buf
-                                (display-buffer "*arduino-verify*")))
-                            (setq-local mode-line-process nil)
-                            (with-current-buffer arduino-verify-process-buf
-                              (when spinner-current (spinner-stop))))
-                :filter (lambda (proc string)
-                          (when (buffer-live-p (process-buffer proc))
-                            (with-current-buffer (process-buffer proc)
-                              (let ((buffer-read-only nil)
-                                    (moving (= (point) (process-mark proc))))
-                                (save-excursion
-                                  ;; Insert the text, advancing the process marker.
-                                  (goto-char (process-mark proc))
-                                  (insert string)
-                                  (set-marker (process-mark proc) (point)))
-                                (if moving (goto-char (process-mark proc))))))))))
-    (spinner-start arduino-spinner-type)
-    (setq mode-line-process proc-name)
-    (with-current-buffer proc-buffer
-      (let ((buffer-read-only nil)) (erase-buffer)
-           (compilation-mode)))))
+  (arduino-compile "verify"))
 
 (defvar arduino-open-process-buf nil)
 
