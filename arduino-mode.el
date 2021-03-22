@@ -246,7 +246,8 @@ Value is a symbol.  The possible values are the symbols in the
                                   (with-current-buffer arduino-verify-process-buf
                                     (setq mode-line-process nil))
                                   (message "Arduino verify build succeed."))
-                              (display-buffer "*arduino-verify*"))
+                              (with-current-buffer arduino-verify-process-buf
+                                (display-buffer "*arduino-verify*")))
                             (setq-local mode-line-process nil)
                             (with-current-buffer arduino-verify-process-buf
                               (when spinner-current (spinner-stop)))))))
