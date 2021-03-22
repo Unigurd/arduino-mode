@@ -224,9 +224,23 @@ Value is a symbol.  The possible values are the symbols in the
                                 (display-buffer "*arduino-upload*")))
                             (setq-local mode-line-process nil)
                             (with-current-buffer arduino-upload-process-buf
-                              (when spinner-current (spinner-stop)))))))
+                              (when spinner-current (spinner-stop))))
+                :filter (lambda (proc string)
+                          (when (buffer-live-p (process-buffer proc))
+                            (with-current-buffer (process-buffer proc)
+                              (let ((buffer-read-only nil)
+                                    (moving (= (point) (process-mark proc))))
+                                (save-excursion
+                                  ;; Insert the text, advancing the process marker.
+                                  (goto-char (process-mark proc))
+                                  (insert string)
+                                  (set-marker (process-mark proc) (point)))
+                                (if moving (goto-char (process-mark proc))))))))))
     (spinner-start arduino-spinner-type)
-    (setq mode-line-process proc-name)))
+    (setq mode-line-process proc-name)
+    (with-current-buffer proc-buffer
+      (let ((buffer-read-only nil)) (erase-buffer)
+           (compilation-mode)))))
 
 (defvar arduino-verify-process-buf nil)
 
@@ -250,9 +264,23 @@ Value is a symbol.  The possible values are the symbols in the
                                 (display-buffer "*arduino-verify*")))
                             (setq-local mode-line-process nil)
                             (with-current-buffer arduino-verify-process-buf
-                              (when spinner-current (spinner-stop)))))))
+                              (when spinner-current (spinner-stop))))
+                :filter (lambda (proc string)
+                          (when (buffer-live-p (process-buffer proc))
+                            (with-current-buffer (process-buffer proc)
+                              (let ((buffer-read-only nil)
+                                    (moving (= (point) (process-mark proc))))
+                                (save-excursion
+                                  ;; Insert the text, advancing the process marker.
+                                  (goto-char (process-mark proc))
+                                  (insert string)
+                                  (set-marker (process-mark proc) (point)))
+                                (if moving (goto-char (process-mark proc))))))))))
     (spinner-start arduino-spinner-type)
-    (setq mode-line-process proc-name)))
+    (setq mode-line-process proc-name)
+    (with-current-buffer proc-buffer
+      (let ((buffer-read-only nil)) (erase-buffer)
+           (compilation-mode)))))
 
 (defvar arduino-open-process-buf nil)
 
